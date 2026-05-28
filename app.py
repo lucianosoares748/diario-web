@@ -10,8 +10,8 @@ app.secret_key = "chave_secreta_super_segura" # Necessário para o sistema de lo
 ARQUIVO_LOGO = "logo.png"
 
 USUARIOS_CADASTRADOS = {
-    "motorista1": ("João Silva", "M-12345", "1234"),
-    "motorista2": ("Maria Souza", "M-67890", "abcd")
+    "Luciano": ("Luciano Soares", "M-10065796", "7480"),
+    "Amanda": ("Amanda marques", "M-10065797", "1234")
 }
 
 def inicializar_banco():
