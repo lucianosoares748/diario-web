@@ -1,0 +1,40 @@
+/* static/estilo.css */
+body {
+  background-color: #f4f6f9;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card-login {
+  max-width: 380px;
+  margin: 50px auto;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.logo-login {
+  max-width: 150px;
+  height: auto;
+  display: block;
+  margin: 0 auto 20px auto;
+}
+
+.card-painel {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.status-badge {
+  font-size: 1rem;
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-weight: bold;
+}
+
+.btn-custom {
+  padding: 12px;
+  font-weight: bold;
+  border-radius: 8px;
+  font-size: 1.05rem;
+}
