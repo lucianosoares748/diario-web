@@ -1,4 +1,3 @@
-<!-- templates/painel.html -->
 <!doctype html>
 <html lang="pt-br">
   <head>
@@ -55,7 +54,6 @@
       </div>
 
       {% if not viagem %}
-      <!-- FORMULÁRIO DE INICIAR VIAGEM + CHECK-LIST -->
       <div class="card card-painel p-4 bg-white">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold m-0">Nova Viagem</h5>
@@ -67,27 +65,21 @@
           <input type="hidden" name="lat_saida" id="lat_input" />
           <input type="hidden" name="lon_saida" id="lon_input" />
 
-          <div class="row mb-3">
-            <div class="col">
-              <label class="form-label fw-bold">Placa do Veículo:</label>
-              <input
-                type="text"
-                name="placa"
-                class="form-control form-control-lg"
-                required
-                placeholder="ABC1D23"
-              />
-            </div>
-            <div class="col">
-              <label class="form-label fw-bold">Nº da Frota:</label>
-              <input
-                type="text"
-                name="frota"
-                class="form-control form-control-lg"
-                required
-                placeholder="F-04"
-              />
-            </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold"
+              >Selecione o Veículo (Frota):</label
+            >
+            <select name="frota" class="form-select form-select-lg" required>
+              <option value="" disabled selected>Escolha o ônibus...</option>
+              {% for veiculo in veiculos %}
+              <option value="{{ veiculo[0] }}">
+                {{ veiculo[0] }} — (Placa: {{ veiculo[1] }})
+              </option>
+              {% endfor %}
+            </select>
+            <p class="text-muted text-xs mt-1" style="font-size: 0.75rem">
+              *Apenas veículos disponíveis no pátio da garagem são listados.
+            </p>
           </div>
 
           <div class="mb-3">
@@ -127,7 +119,6 @@
             </div>
           </div>
 
-          <!-- SEÇÃO VISUAL DO CHECK-LIST -->
           <div class="border rounded p-3 mb-4 bg-light">
             <h6
               class="fw-bold text-secondary mb-3 text-center border-bottom pb-2"
@@ -378,7 +369,6 @@
       </div>
 
       {% else %}
-      <!-- FORMULÁRIO DE FINALIZAR VIAGEM -->
       <div class="card card-painel p-4 bg-white">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold m-0">Viagem Atual</h5>
@@ -464,22 +454,27 @@
         const lonInput = document.getElementById("lon_input");
         const btnSubmit = document.getElementById("btn-submit");
         const gpsStatus = document.getElementById("gps-status");
-        const isIniciar =
-          document.querySelector('input[name="acao"]').value === "iniciar";
+        const formViagem = document.getElementById("form-viagem");
+        const hiddenAcao = formViagem
+          ? formViagem.querySelector('input[name="acao"]')
+          : null;
+        const isIniciar = hiddenAcao ? hiddenAcao.value === "iniciar" : true;
 
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition(
             function (position) {
-              latInput.value = position.coords.latitude;
-              lonInput.value = position.coords.longitude;
+              if (latInput) latInput.value = position.coords.latitude;
+              if (lonInput) lonInput.value = position.coords.longitude;
               gpsStatus.className =
                 "alert alert-success text-center py-1 small mb-2";
               gpsStatus.innerHTML =
                 "✅ Localização via GPS fixada com sucesso!";
-              btnSubmit.disabled = false;
-              btnSubmit.innerHTML = isIniciar
-                ? "🛫 Iniciar Viagem"
-                : "🏁 Finalizar Viagem";
+              if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = isIniciar
+                  ? "🛫 Iniciar Viagem"
+                  : "🏁 Finalizar Viagem";
+              }
             },
             function (error) {
               gpsStatus.className =

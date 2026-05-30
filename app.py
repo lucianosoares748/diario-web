@@ -15,7 +15,6 @@ USUARIOS_CADASTRADOS = {
     "admin1": ("Carlos Gestor", "A-00001", "admin123", "admin")
 }
 
-# Lista com todos os itens do check-list para facilitar a automação no código
 ITENS_CHECKLIST = [
     "pneus", "combustivel", "arla", "vidros_laterais", "parabrisa", 
     "limpadores", "farol_baixo", "farol_alto", "seta_direita", 
@@ -27,7 +26,7 @@ def inicializar_banco():
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     
-    # Tabela principal de viagens
+    # Tabela de viagens
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS viagens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,14 +44,12 @@ def inicializar_banco():
             status TEXT DEFAULT 'Em Andamento',
             placa TEXT,
             frota TEXT,
-            lat_saida TEXT,
-            lon_saida TEXT,
-            lat_chegada TEXT,
-            lon_chegada TEXT
+            lat_saida TEXT, lon_saida TEXT,
+            lat_chegada TEXT, lon_chegada TEXT
         )
     """)
     
-    # Nova Tabela para armazenar os Check-lists vinculados à viagem
+    # Tabela de checklists
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS checklists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,12 +62,39 @@ def inicializar_banco():
         )
     """)
     
-    # Migração segura de colunas antigas caso necessário
-    novas_colunas = ["lat_saida", "lon_saida", "lat_chegada", "lon_chegada"]
-    for col in novas_colunas:
-        try: cursor.execute(f"ALTER TABLE viagens ADD COLUMN {col} TEXT")
-        except sqlite3.OperationalError: pass
-            
+    # Tabela de Veículos da Frota (15 Ônibus)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS veiculos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            frota TEXT UNIQUE,
+            placa TEXT,
+            status TEXT DEFAULT 'Disponível',
+            obs_manutencao TEXT
+        )
+    """)
+    
+    # Inserir os 15 ônibus padrão com numeração de frotas e placas Mercosul aleatórias
+    cursor.execute("SELECT COUNT(*) FROM veiculos")
+    if cursor.fetchone()[0] == 0:
+        onibus_iniciais = [
+            ("F-01", "ABC1D23"),
+            ("F-02", "XYZ9H87"),
+            ("F-03", "KGB5M44"),
+            ("F-04", "OPX2T11"),
+            ("F-05", "BRS7K22"),
+            ("F-06", "MTR4J89"),
+            ("F-07", "QWE3F45"),
+            ("F-08", "PLM9N12"),
+            ("F-09", "OKI8B77"),
+            ("F-10", "ZXC6V55"),
+            ("F-11", "JHG2F11"),
+            ("F-12", "REW5T99"),
+            ("F-13", "VBN8M33"),
+            ("F-14", "HJK4L22"),
+            ("F-15", "POI7U11")
+        ]
+        cursor.executemany("INSERT INTO veiculos (frota, placa) VALUES (?, ?)", onibus_iniciais)
+    
     conn.commit()
     conn.close()
 
@@ -105,6 +129,10 @@ def painel():
     cursor.execute("SELECT id, origem, km_saida, hora_saida, data, placa, frota FROM viagens WHERE motorista = ? AND status = 'Em Andamento'", (session["nome"],))
     viagem_andamento = cursor.fetchone()
     
+    # Busca apenas os ônibus disponíveis no pátio para o motorista poder escolher
+    cursor.execute("SELECT frota, placa FROM veiculos WHERE status = 'Disponível' ORDER BY frota")
+    veiculos_disponiveis = cursor.fetchall()
+    
     if request.method == "POST":
         acao = request.form.get("acao")
         
@@ -112,12 +140,24 @@ def painel():
             origem = request.form.get("origem")
             km_saida = request.form.get("km_saida")
             hora_saida = request.form.get("hora_saida")
-            placa = request.form.get("placa").strip().upper()
-            frota = request.form.get("frota").strip()
+            
+            frota = request.form.get("frota")
+            cursor.execute("SELECT placa FROM veiculos WHERE frota = ?", (frota,))
+            resultado_placa = cursor.fetchone()
+            placa = resultado_placa[0] if resultado_placa else "Sem Placa"
+            
             lat_saida = request.form.get("lat_saida")
             lon_saida = request.form.get("lon_saida")
             data_atual = datetime.now().strftime("%d/%m/%Y")
             
+            # Verifica se o veículo ainda está disponível
+            cursor.execute("SELECT status FROM veiculos WHERE frota = ?", (frota,))
+            status_atual = cursor.fetchone()[0]
+            if status_atual != "Disponível":
+                flash("Este veículo acabou de ser pego ou entrou em manutenção!", "erro")
+                conn.close()
+                return redirect(url_for("painel"))
+
             # 1. Salva a viagem
             cursor.execute("""
                 INSERT INTO viagens (motorista, matricula, data, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida, status)
@@ -125,10 +165,11 @@ def painel():
             """, (session["nome"], session["matricula"], data_atual, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida))
             viagem_id = cursor.lastrowid
             
-            # 2. Captura as respostas do check-list (se vier marcado no form é 'OK', se não vier é 'Não Conforme')
-            respostas_chk = {item: ("OK" if request.form.get(f"chk_{item}") else "Não Conforme") for item in ITENS_CHECKLIST}
+            # 2. Atualiza o status do veículo para 'Em Trajeto'
+            cursor.execute("UPDATE veiculos SET status = 'Em Trajeto' WHERE frota = ?", (frota,))
             
-            # 3. Salva o check-list no banco
+            # 3. Salva o checklist
+            respostas_chk = {item: ("OK" if request.form.get(f"chk_{item}") else "Não Conforme") for item in ITENS_CHECKLIST}
             cursor.execute("""
                 INSERT INTO checklists (
                     viagem_id, pneus, combustivel, arla, vidros_laterais, parabrisa,
@@ -147,6 +188,7 @@ def painel():
             
             conn.commit()
             flash("Check-list registrado e viagem iniciada!", "sucesso")
+            conn.close()
             return redirect(url_for("painel"))
             
         elif acao == "finalizar":
@@ -158,24 +200,32 @@ def painel():
             lat_chegada = request.form.get("lat_chegada")
             lon_chegada = request.form.get("lon_chegada")
             
-            cursor.execute("SELECT km_saida FROM viagens WHERE id = ?", (viagem_id,))
-            km_saida = cursor.fetchone()[0]
+            cursor.execute("SELECT km_saida, frota FROM viagens WHERE id = ?", (viagem_id,))
+            viagem_dados = cursor.fetchone()
+            km_saida = viagem_dados[0]
+            frota_veiculo = viagem_dados[1]
             
             if km_chegada < km_saida:
                 flash("O KM de chegada não pode ser menor que o de saída!", "erro")
             else:
                 km_rodados = km_chegada - km_saida
+                # Finaliza a viagem
                 cursor.execute("""
                     UPDATE viagens 
                     SET destino = ?, km_chegada = ?, hora_chegada = ?, km_rodados = ?, motivo = ?, lat_chegada = ?, lon_chegada = ?, status = 'Finalizada'
                     WHERE id = ?
                 """, (destino, km_chegada, hora_chegada, km_rodados, motivo, lat_chegada, lon_chegada, viagem_id))
+                
+                # Devolve o veículo para o status 'Disponível'
+                cursor.execute("UPDATE veiculos SET status = 'Disponível' WHERE frota = ?", (frota_veiculo,))
+                
                 conn.commit()
-                flash("Viagem finalizada com sucesso!", "sucesso")
+                flash("Viagem finalizada! Ônibus disponível no pátio.", "sucesso")
+                conn.close()
                 return redirect(url_for("painel"))
                 
     conn.close()
-    return render_template("painel.html", viagem=viagem_andamento)
+    return render_template("painel.html", viagem=viagem_andamento, veiculos=veiculos_disponiveis)
 
 @app.route("/historico")
 def historico():
@@ -202,35 +252,60 @@ def admin_painel():
     cursor.execute("SELECT id, data, motorista, origem, destino, km_rodados, placa, frota, lat_saida, lon_saida, lat_chegada, lon_chegada FROM viagens WHERE status = 'Finalizada' ORDER BY id DESC")
     finalizadas = cursor.fetchall()
     
+    # Carrega os 15 veículos com motorista/destino da viagem atual ativa se houver
+    cursor.execute("""
+        SELECT v.frota, v.placa, v.status, v.obs_manutencao, vi.motorista, vi.destino, vi.id
+        FROM veiculos v
+        LEFT JOIN viagens vi ON v.frota = vi.frota AND vi.status = 'Em Andamento'
+        ORDER BY v.frota
+    """)
+    frota_dashboard = cursor.fetchall()
+    
     conn.close()
-    return render_template("admin.html", em_andamento=em_andamento, finalizadas=finalizadas)
+    return render_template("admin.html", em_andamento=em_andamento, finalizadas=finalizadas, frota=frota_dashboard)
+
+@app.route("/admin/manutencao/iniciar", methods=["POST"])
+def enviar_manutencao():
+    if "usuario" not in session or session["perfil"] != "admin": return redirect(url_for("login"))
+    frota = request.form.get("frota")
+    motivo = request.form.get("motivo", "Reparo geral")
+    
+    conn = sqlite3.connect("diario_bordo.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE veiculos SET status = 'Manutenção', obs_manutencao = ? WHERE frota = ?", (motivo, frota))
+    conn.commit()
+    conn.close()
+    flash(f"Veículo {frota} enviado para a oficina.", "sucesso")
+    return redirect(url_for("admin_painel"))
+
+@app.route("/admin/manutencao/liberar/<frota>")
+def liberar_manutencao(frota):
+    if "usuario" not in session or session["perfil"] != "admin": return redirect(url_for("login"))
+    
+    conn = sqlite3.connect("diario_bordo.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE veiculos SET status = 'Disponível', obs_manutencao = NULL WHERE frota = ?", (frota,))
+    conn.commit()
+    conn.close()
+    flash(f"Veículo {frota} liberado de volta para o pátio!", "sucesso")
+    return redirect(url_for("admin_painel"))
 
 @app.route("/admin/checklist/<int:viagem_id>")
 def visualizar_checklist(viagem_id):
-    if "usuario" not in session or session["perfil"] != "admin":
-        return redirect(url_for("login"))
-        
+    if "usuario" not in session or session["perfil"] != "admin": return redirect(url_for("login"))
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
-    
-    # Puxa informações da viagem + do checklist de forma cruzada
     cursor.execute("""
         SELECT v.motorista, v.placa, v.frota, v.data,
                c.pneus, c.combustivel, c.arla, c.vidros_laterais, c.parabrisa,
                c.limpadores, c.farol_baixo, c.farol_alto, c.seta_direita,
                c.seta_esquerda, c.pisca_alerta, c.carroceria, c.parachoque_dianteiro,
                c.parachoque_traseiro, c.freio_estacionario, c.interior, c.cintos
-        FROM checklists c
-        JOIN viagens v ON c.viagem_id = v.id
-        WHERE c.viagem_id = ?
+        FROM checklists c JOIN viagens v ON c.viagem_id = v.id WHERE c.viagem_id = ?
     """, (viagem_id,))
     chk = cursor.fetchone()
     conn.close()
-    
-    if not chk:
-        return "Check-list não localizado para esta viagem.", 404
-        
-    # Organiza em um dicionário estruturado para enviar ao template dinâmico
+    if not chk: return "Check-list não localizado.", 404
     dados_checklist = {
         "motorista": chk[0], "placa": chk[1], "frota": chk[2], "data": chk[3],
         "itens": {
@@ -246,25 +321,19 @@ def visualizar_checklist(viagem_id):
 
 @app.route("/gerar_pdf/<int:id_viagem>")
 def gerar_pdf(id_viagem):
-    if "usuario" not in session:
-        return redirect(url_for("login"))
-        
+    if "usuario" not in session: return redirect(url_for("login"))
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     cursor.execute("SELECT motorista, matricula, data, origem, destino, km_saida, km_chegada, hora_saida, hora_chegada, km_rodados, motivo, placa, frota, lat_saida, lon_saida, lat_chegada, lon_chegada FROM viagens WHERE id = ?", (id_viagem,))
-    resultado = cursor.fetchone()
+    resultado = snapshot = cursor.fetchone()
     conn.close()
-    
-    if not resultado:
-        return "Viagem não encontrada", 404
+    if not resultado: return "Viagem não encontrada", 404
 
     dados = {
         "motorista": resultado[0], "matricula": resultado[1], "data": resultado[2],
         "origem": resultado[3], "destino": resultado[4], "km_saida": resultado[5],
         "km_chegada": float(resultado[6]) if resultado[6] else 0.0, "hora_saida": resultado[7], "hora_chegada": resultado[8],
-        "km_rodados": resultado[9], "motivo": resultado[10],
-        "placa": resultado[11] if resultado[11] else "Não Informado",
-        "frota": resultado[12] if resultado[12] else "Não Informado",
+        "km_rodados": resultado[9], "motivo": resultado[10], "placa": resultado[11], "frota": resultado[12],
         "coordenadas": f"Saída: ({resultado[13]}, {resultado[14]}) | Chegada: ({resultado[15]}, {resultado[16]})" if resultado[13] else "Não registradas"
     }
 
@@ -273,48 +342,23 @@ def gerar_pdf(id_viagem):
     pdf.set_fill_color(33, 150, 243) 
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", "B", 14)
-    
-    if os.path.exists(ARQUIVO_LOGO):
-        pdf.cell(130, 15, "RELATÓRIO DE VIAGEM / DIÁRIO DE BORDO", ln=False, align="C", fill=True)
-        pdf.image(ARQUIVO_LOGO, x=150, y=10, w=50)
-        pdf.ln(20)
-    else:
-        pdf.cell(0, 15, "RELATÓRIO DE VIAGEM / DIÁRIO DE BORDO", ln=True, align="C", fill=True)
-        pdf.ln(10)
-        
+    pdf.cell(0, 15, "RELATÓRIO DE VIAGEM / DIÁRIO DE BORDO", ln=True, align="C", fill=True)
+    pdf.ln(10)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, "1. Identificação do Condutor e Veículo", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.cell(0, 6, f"Motorista: {dados['motorista']}  |  Matrícula: {dados['matricula']}", ln=True)
-    pdf.cell(0, 6, f"Veículo (Placa): {dados['placa']}  |  Nº da Frota: {dados['frota']}", ln=True)
-    pdf.cell(0, 6, f"Data da Viagem: {dados['data']}", ln=True)
+    pdf.cell(0, 6, f"Motorista: {dados['motorista']} | Matrícula: {dados['matricula']}", ln=True)
+    pdf.cell(0, 6, f"Veículo (Placa): {dados['placa']} | Nº da Frota: {dados['frota']}", ln=True)
     pdf.ln(5)
-    
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "2. Rota e Percurso Rodado", ln=True)
+    pdf.cell(0, 8, "2. Percurso", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.cell(0, 6, f"Origem: {dados['origem']}   |   Destino: {dados['destino']}", ln=True)
-    pdf.cell(0, 6, f"KM de Saída: {dados['km_saida']} KM  |  Horário de Saída: {dados['hora_saida']}", ln=True)
-    pdf.cell(0, 6, f"KM de Chegada: {dados['km_chegada']} KM  |  Horário de Chegada: {dados['hora_chegada']}", ln=True)
-    pdf.cell(0, 6, f"GPS Coordenadas: {dados['coordenadas']}", ln=True)
-    pdf.set_font("Arial", "B", 11)
-    pdf.cell(0, 8, f"Total Quilometragem Rodada: {dados['km_rodados']} KM", ln=True)
-    pdf.ln(5)
-    
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "3. Justificativa / Motivo da Viagem", ln=True)
-    pdf.set_font("Arial", "", 11)
-    pdf.multi_cell(0, 6, dados['motivo'])
-    pdf.ln(25)
-    
-    pdf.cell(0, 0, "", border="T", ln=True, align="C")
-    pdf.set_font("Arial", "I", 10)
-    pdf.cell(0, 8, f"Assinatura do Motorista ({dados['motorista']})", ln=True, align="C")
+    pdf.cell(0, 6, f"Origem: {dados['origem']} -> Destino: {dados['destino']}", ln=True)
+    pdf.cell(0, 8, f"Total Rodado: {dados['km_rodados']} KM", ln=True)
     
     nome_arquivo = f"viagem_id{id_viagem}.pdf"
     pdf.output(nome_arquivo)
-    
     return send_file(nome_arquivo, as_attachment=True)
 
 if __name__ == "__main__":
