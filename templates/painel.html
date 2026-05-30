@@ -1,3 +1,4 @@
+<!-- templates/painel.html -->
 <!doctype html>
 <html lang="pt-br">
   <head>
@@ -54,6 +55,7 @@
       </div>
 
       {% if not viagem %}
+      <!-- FORMULÁRIO DE INICIAR VIAGEM + CHECK-LIST -->
       <div class="card card-painel p-4 bg-white">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold m-0">Nova Viagem</h5>
@@ -62,7 +64,6 @@
 
         <form action="/painel" method="POST" id="form-viagem">
           <input type="hidden" name="acao" value="iniciar" />
-
           <input type="hidden" name="lat_saida" id="lat_input" />
           <input type="hidden" name="lon_saida" id="lon_input" />
 
@@ -91,14 +92,18 @@
 
           <div class="mb-3">
             <label class="form-label fw-bold">Cidade de Origem:</label>
-            <input
-              type="text"
-              name="origem"
-              class="form-control form-control-lg"
-              required
-              placeholder="Ex: Bataguassu"
-            />
+            <select name="origem" class="form-select form-select-lg" required>
+              <option value="" disabled selected>Selecione a origem...</option>
+              <option value="Três Lagoas">Três Lagoas</option>
+              <option value="Bataguassu">Bataguassu</option>
+              <option value="Inocência">Inocência</option>
+              <option value="Santa Rita do Pardo">Santa Rita do Pardo</option>
+              <option value="Brasilândia">Brasilândia</option>
+              <option value="Águas Claras">Águas Claras</option>
+              <option value="Ribas do Rio Pardo">Ribas do Rio Pardo</option>
+            </select>
           </div>
+
           <div class="row mb-4">
             <div class="col">
               <label class="form-label fw-bold">KM de Saída:</label>
@@ -121,6 +126,246 @@
               />
             </div>
           </div>
+
+          <!-- SEÇÃO VISUAL DO CHECK-LIST -->
+          <div class="border rounded p-3 mb-4 bg-light">
+            <h6
+              class="fw-bold text-secondary mb-3 text-center border-bottom pb-2"
+            >
+              📋 Check-list Obrigatório de Inspeção
+            </h6>
+            <p class="text-muted text-center" style="font-size: 0.8rem">
+              Ative apenas os itens que estão em conformidade (OK) para viagem.
+            </p>
+
+            <div
+              class="row row-cols-1 g-2"
+              style="max-height: 250px; overflow-y: auto; padding-right: 5px"
+            >
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🛞 Pneus / Calibragem</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_pneus"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>⛽ Nível Combustível</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_combustivel"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🧪 Nível de Arla 32</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_arla"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🪟 Vidros Laterais</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_vidros_laterais"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🛡️ Vidro Para-brisa</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_parabrisa"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🌧️ Limpadores Para-brisa</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_limpadores"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>💡 Farol Baixo</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_farol_baixo"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🔦 Farol Alto</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_farol_alto"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>➡️ Seta Direita</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_seta_direita"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>⬅️ Seta Esquerda</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_seta_esquerda"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>⚠️ Pisca Alerta</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_pisca_alerta"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>📦 Estrutura Carroceria</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_carroceria"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🚘 Para-choque Dianteiro</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_parachoque_dianteiro"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🛑 Para-choque Traseiro</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_parachoque_traseiro"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🅿️ Freio Estacionário</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_freio_estacionario"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>💺 Higienização Interior</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_interior"
+                    checked
+                  />
+                </div>
+              </div>
+              <div
+                class="col d-flex justify-content-between align-items-center border-bottom py-1"
+              >
+                <span>🎗️ Cintos de Segurança</span>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="chk_cintos"
+                    checked
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <button
             type="submit"
             id="btn-submit"
@@ -133,6 +378,7 @@
       </div>
 
       {% else %}
+      <!-- FORMULÁRIO DE FINALIZAR VIAGEM -->
       <div class="card card-painel p-4 bg-white">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold m-0">Viagem Atual</h5>
@@ -150,20 +396,23 @@
         <form action="/painel" method="POST" id="form-viagem">
           <input type="hidden" name="acao" value="finalizar" />
           <input type="hidden" name="viagem_id" value="{{ viagem[0] }}" />
-
           <input type="hidden" name="lat_chegada" id="lat_input" />
           <input type="hidden" name="lon_chegada" id="lon_input" />
 
           <div class="mb-3">
             <label class="form-label fw-bold">Cidade de Destino:</label>
-            <input
-              type="text"
-              name="destino"
-              class="form-control form-control-lg"
-              required
-              placeholder="Ex: Campo Grande"
-            />
+            <select name="destino" class="form-select form-select-lg" required>
+              <option value="" disabled selected>Selecione o destino...</option>
+              <option value="Três Lagoas">Três Lagoas</option>
+              <option value="Bataguassu">Bataguassu</option>
+              <option value="Inocência">Inocência</option>
+              <option value="Santa Rita do Pardo">Santa Rita do Pardo</option>
+              <option value="Brasilândia">Brasilândia</option>
+              <option value="Águas Claras">Águas Claras</option>
+              <option value="Ribas do Rio Pardo">Ribas do Rio Pardo</option>
+            </select>
           </div>
+
           <div class="row mb-3">
             <div class="col">
               <label class="form-label fw-bold">KM de Chegada:</label>
@@ -221,22 +470,18 @@
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition(
             function (position) {
-              // Sucesso ao capturar coordenadas
               latInput.value = position.coords.latitude;
               lonInput.value = position.coords.longitude;
-
               gpsStatus.className =
                 "alert alert-success text-center py-1 small mb-2";
               gpsStatus.innerHTML =
                 "✅ Localização via GPS fixada com sucesso!";
-
               btnSubmit.disabled = false;
               btnSubmit.innerHTML = isIniciar
                 ? "🛫 Iniciar Viagem"
                 : "🏁 Finalizar Viagem";
             },
             function (error) {
-              // Caso o motorista recuse dar a permissão de localização
               gpsStatus.className =
                 "alert alert-danger text-center py-1 small mb-2";
               gpsStatus.innerHTML =

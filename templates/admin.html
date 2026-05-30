@@ -1,3 +1,4 @@
+<!-- templates/admin.html -->
 <!doctype html>
 <html lang="pt-br">
   <head>
@@ -29,6 +30,7 @@
         <strong class="text-dark h5">{{ session['nome'] }}</strong>
       </div>
 
+      <!-- 1. VIAGENS EM ANDAMENTO -->
       <div class="card p-3 shadow-sm bg-white border-0 rounded-4 mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold m-0 text-warning">🟠 Viagens em Andamento</h5>
@@ -44,7 +46,7 @@
                 <th>Motorista</th>
                 <th>Veículo</th>
                 <th>Origem</th>
-                <th>Saída</th>
+                <th>Check-list</th>
                 <th>Localização</th>
               </tr>
             </thead>
@@ -59,13 +61,16 @@
                 </td>
                 <td>{{ v[2] }}</td>
                 <td>
-                  {{ v[3] }} KM às
-                  <span class="badge bg-secondary">{{ v[4] }}</span>
+                  <a
+                    href="/admin/checklist/{{ v[9] }}"
+                    class="btn btn-sm btn-info text-white fw-bold"
+                    >📋 Ver Checklist</a
+                  >
                 </td>
                 <td>
                   {% if v[7] %}
                   <a
-                    href="https://www.google.com/maps/search/?api=1&query={{ v[7] }},{{ v[8] }}"
+                    href="https://maps.google.com/?q={{ v[7] }},{{ v[8] }}"
                     target="_blank"
                     class="btn btn-sm btn-outline-warning fw-bold"
                     >📍 Ver Mapa</a
@@ -87,6 +92,7 @@
         </div>
       </div>
 
+      <!-- 2. HISTÓRICO GERAL -->
       <div class="card p-3 shadow-sm bg-white border-0 rounded-4">
         <h5 class="fw-bold mb-3 text-success">
           🟢 Histórico Geral de Fechamentos
@@ -100,6 +106,7 @@
                 <th>Veículo</th>
                 <th>Rota (Origem ➔ Destino)</th>
                 <th>Total KM</th>
+                <th class="text-center">Check-list</th>
                 <th class="text-center">Mapa GPS</th>
                 <th class="text-center">Relatório</th>
               </tr>
@@ -117,16 +124,24 @@
                   <span class="badge bg-info text-dark">{{ v[5] }} KM</span>
                 </td>
                 <td class="text-center">
+                  <a
+                    href="/admin/checklist/{{ v[0] }}"
+                    class="btn btn-xs btn-outline-info p-1 small"
+                    style="font-size: 0.75rem"
+                    >📋 Ver</a
+                  >
+                </td>
+                <td class="text-center">
                   {% if v[8] %}
                   <a
-                    href="https://www.google.com/maps/search/?api=1&query={{ v[8] }},{{ v[9] }}"
+                    href="https://maps.google.com/?q={{ v[8] }},{{ v[9] }}"
                     target="_blank"
                     class="btn btn-xs btn-outline-secondary p-1 small"
                     style="font-size: 0.75rem"
                     >🛫 Saída</a
                   >
                   <a
-                    href="https://www.google.com/maps/search/?api=1&query={{ v[10] }},{{ v[11] }}"
+                    href="https://maps.google.com/?q={{ v[10] }},{{ v[11] }}"
                     target="_blank"
                     class="btn btn-xs btn-outline-dark p-1 small"
                     style="font-size: 0.75rem"
@@ -146,7 +161,7 @@
               </tr>
               {% else %}
               <tr>
-                <td colspan="7" class="text-center text-muted py-3">
+                <td colspan="8" class="text-center text-muted py-3">
                   Nenhuma viagem finalizada no sistema.
                 </td>
               </tr>

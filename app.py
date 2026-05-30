@@ -15,9 +15,19 @@ USUARIOS_CADASTRADOS = {
     "admin1": ("Carlos Gestor", "A-00001", "admin123", "admin")
 }
 
+# Lista com todos os itens do check-list para facilitar a automação no código
+ITENS_CHECKLIST = [
+    "pneus", "combustivel", "arla", "vidros_laterais", "parabrisa", 
+    "limpadores", "farol_baixo", "farol_alto", "seta_direita", 
+    "seta_esquerda", "pisca_alerta", "carroceria", "parachoque_dianteiro", 
+    "parachoque_traseiro", "freio_estacionario", "interior", "cintos"
+]
+
 def inicializar_banco():
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
+    
+    # Tabela principal de viagens
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS viagens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,20 +45,31 @@ def inicializar_banco():
             status TEXT DEFAULT 'Em Andamento',
             placa TEXT,
             frota TEXT,
-            lat_saida TEXT,    -- Nova coluna
-            lon_saida TEXT,    -- Nova coluna
-            lat_chegada TEXT,  -- Nova coluna
-            lon_chegada TEXT   -- Nova coluna
+            lat_saida TEXT,
+            lon_saida TEXT,
+            lat_chegada TEXT,
+            lon_chegada TEXT
         )
     """)
     
-    # Código de segurança para adicionar as novas colunas caso o banco já exista
+    # Nova Tabela para armazenar os Check-lists vinculados à viagem
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS checklists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            viagem_id INTEGER,
+            pneus TEXT, combustivel TEXT, arla TEXT, vidros_laterais TEXT, parabrisa TEXT,
+            limpadores TEXT, farol_baixo TEXT, farol_alto TEXT, seta_direita TEXT,
+            seta_esquerda TEXT, pisca_alerta TEXT, carroceria TEXT, parachoque_dianteiro TEXT,
+            parachoque_traseiro TEXT, freio_estacionario TEXT, interior TEXT, cintos TEXT,
+            FOREIGN KEY(viagem_id) REFERENCES viagens(id)
+        )
+    """)
+    
+    # Migração segura de colunas antigas caso necessário
     novas_colunas = ["lat_saida", "lon_saida", "lat_chegada", "lon_chegada"]
     for col in novas_colunas:
-        try:
-            cursor.execute(f"ALTER TABLE viagens ADD COLUMN {col} TEXT")
-        except sqlite3.OperationalError:
-            pass
+        try: cursor.execute(f"ALTER TABLE viagens ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError: pass
             
     conn.commit()
     conn.close()
@@ -58,20 +79,14 @@ def login():
     if request.method == "POST":
         usuario = request.form.get("usuario").strip()
         senha = request.form.get("senha").strip()
-        
         if usuario in USUARIOS_CADASTRADOS and USUARIOS_CADASTRADOS[usuario][2] == senha:
             session["usuario"] = usuario
             session["nome"] = USUARIOS_CADASTRADOS[usuario][0]
             session["matricula"] = USUARIOS_CADASTRADOS[usuario][1]
             session["perfil"] = USUARIOS_CADASTRADOS[usuario][3]
-            
-            if session["perfil"] == "admin":
-                return redirect(url_for("admin_painel"))
-            else:
-                return redirect(url_for("painel"))
+            return redirect(url_for("admin_painel" if session["perfil"] == "admin" else "painel"))
         else:
             flash("Usuário ou senha incorretos!", "erro")
-            
     return render_template("login.html")
 
 @app.route("/logout")
@@ -87,7 +102,7 @@ def painel():
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     
-    cursor.execute("SELECT id, origem, km_saida, hora_saida, data, placa, frota, lat_saida, lon_saida FROM viagens WHERE motorista = ? AND status = 'Em Andamento'", (session["nome"],))
+    cursor.execute("SELECT id, origem, km_saida, hora_saida, data, placa, frota FROM viagens WHERE motorista = ? AND status = 'Em Andamento'", (session["nome"],))
     viagem_andamento = cursor.fetchone()
     
     if request.method == "POST":
@@ -103,12 +118,35 @@ def painel():
             lon_saida = request.form.get("lon_saida")
             data_atual = datetime.now().strftime("%d/%m/%Y")
             
+            # 1. Salva a viagem
             cursor.execute("""
                 INSERT INTO viagens (motorista, matricula, data, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Em Andamento')
             """, (session["nome"], session["matricula"], data_atual, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida))
+            viagem_id = cursor.lastrowid
+            
+            # 2. Captura as respostas do check-list (se vier marcado no form é 'OK', se não vier é 'Não Conforme')
+            respostas_chk = {item: ("OK" if request.form.get(f"chk_{item}") else "Não Conforme") for item in ITENS_CHECKLIST}
+            
+            # 3. Salva o check-list no banco
+            cursor.execute("""
+                INSERT INTO checklists (
+                    viagem_id, pneus, combustivel, arla, vidros_laterais, parabrisa,
+                    limpadores, farol_baixo, farol_alto, seta_direita, seta_esquerda,
+                    pisca_alerta, carroceria, parachoque_dianteiro, parachoque_traseiro,
+                    freio_estacionario, interior, cintos
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                viagem_id, respostas_chk["pneus"], respostas_chk["combustivel"], respostas_chk["arla"],
+                respostas_chk["vidros_laterais"], respostas_chk["parabrisa"], respostas_chk["limpadores"],
+                respostas_chk["farol_baixo"], respostas_chk["farol_alto"], respostas_chk["seta_direita"],
+                respostas_chk["seta_esquerda"], respostas_chk["pisca_alerta"], respostas_chk["carroceria"],
+                respostas_chk["parachoque_dianteiro"], respostas_chk["parachoque_traseiro"],
+                respostas_chk["freio_estacionario"], respostas_chk["interior"], respostas_chk["cintos"]
+            ))
+            
             conn.commit()
-            flash("Viagem iniciada com sucesso!", "sucesso")
+            flash("Check-list registrado e viagem iniciada!", "sucesso")
             return redirect(url_for("painel"))
             
         elif acao == "finalizar":
@@ -143,13 +181,11 @@ def painel():
 def historico():
     if "usuario" not in session or session["perfil"] != "motorista":
         return redirect(url_for("login"))
-        
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     cursor.execute("SELECT id, data, motorista, origem, destino, km_rodados FROM viagens WHERE motorista = ? AND status = 'Finalizada' ORDER BY id DESC", (session["nome"],))
     viagens = cursor.fetchall()
     conn.close()
-    
     return render_template("historico.html", viagens=viagens)
 
 @app.route("/admin/painel")
@@ -160,16 +196,53 @@ def admin_painel():
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     
-    # Busca incluindo lat e lon da saída
-    cursor.execute("SELECT data, motorista, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida FROM viagens WHERE status = 'Em Andamento' ORDER BY id DESC")
+    cursor.execute("SELECT data, motorista, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida, id FROM viagens WHERE status = 'Em Andamento' ORDER BY id DESC")
     em_andamento = cursor.fetchall()
     
-    # Busca incluindo lat e lon de saída e chegada
     cursor.execute("SELECT id, data, motorista, origem, destino, km_rodados, placa, frota, lat_saida, lon_saida, lat_chegada, lon_chegada FROM viagens WHERE status = 'Finalizada' ORDER BY id DESC")
     finalizadas = cursor.fetchall()
     
     conn.close()
     return render_template("admin.html", em_andamento=em_andamento, finalizadas=finalizadas)
+
+@app.route("/admin/checklist/<int:viagem_id>")
+def visualizar_checklist(viagem_id):
+    if "usuario" not in session or session["perfil"] != "admin":
+        return redirect(url_for("login"))
+        
+    conn = sqlite3.connect("diario_bordo.db")
+    cursor = conn.cursor()
+    
+    # Puxa informações da viagem + do checklist de forma cruzada
+    cursor.execute("""
+        SELECT v.motorista, v.placa, v.frota, v.data,
+               c.pneus, c.combustivel, c.arla, c.vidros_laterais, c.parabrisa,
+               c.limpadores, c.farol_baixo, c.farol_alto, c.seta_direita,
+               c.seta_esquerda, c.pisca_alerta, c.carroceria, c.parachoque_dianteiro,
+               c.parachoque_traseiro, c.freio_estacionario, c.interior, c.cintos
+        FROM checklists c
+        JOIN viagens v ON c.viagem_id = v.id
+        WHERE c.viagem_id = ?
+    """, (viagem_id,))
+    chk = cursor.fetchone()
+    conn.close()
+    
+    if not chk:
+        return "Check-list não localizado para esta viagem.", 404
+        
+    # Organiza em um dicionário estruturado para enviar ao template dinâmico
+    dados_checklist = {
+        "motorista": chk[0], "placa": chk[1], "frota": chk[2], "data": chk[3],
+        "itens": {
+            "Pneus / Calibragem": chk[4], "Nível de Combustível": chk[5], "Fluido Arla 32": chk[6],
+            "Vidros Laterais": chk[7], "Para-brisa": chk[8], "Limpadores de Para-brisa": chk[9],
+            "Farol Baixo": chk[10], "Farol Alto": chk[11], "Seta Direita": chk[12],
+            "Seta Esquerda": chk[13], "Pisca Alerta": chk[14], "Estrutura da Carroceria": chk[15],
+            "Para-choque Dianteiro": chk[16], "Para-choque Traseiro": chk[17],
+            "Freio de Estacionamento": chk[18], "Higienização Interior": chk[19], "Cintos de Segurança": chk[20]
+        }
+    }
+    return render_template("checklist_ver.html", chk=dados_checklist)
 
 @app.route("/gerar_pdf/<int:id_viagem>")
 def gerar_pdf(id_viagem):
@@ -188,7 +261,7 @@ def gerar_pdf(id_viagem):
     dados = {
         "motorista": resultado[0], "matricula": resultado[1], "data": resultado[2],
         "origem": resultado[3], "destino": resultado[4], "km_saida": resultado[5],
-        "km_chegada": Float(resultado[6]) if resultado[6] else 0.0, "hora_saida": resultado[7], "hora_chegada": resultado[8],
+        "km_chegada": float(resultado[6]) if resultado[6] else 0.0, "hora_saida": resultado[7], "hora_chegada": resultado[8],
         "km_rodados": resultado[9], "motivo": resultado[10],
         "placa": resultado[11] if resultado[11] else "Não Informado",
         "frota": resultado[12] if resultado[12] else "Não Informado",
@@ -224,7 +297,7 @@ def gerar_pdf(id_viagem):
     pdf.cell(0, 6, f"Origem: {dados['origem']}   |   Destino: {dados['destino']}", ln=True)
     pdf.cell(0, 6, f"KM de Saída: {dados['km_saida']} KM  |  Horário de Saída: {dados['hora_saida']}", ln=True)
     pdf.cell(0, 6, f"KM de Chegada: {dados['km_chegada']} KM  |  Horário de Chegada: {dados['hora_chegada']}", ln=True)
-    pdf.cell(0, 6, f"GPS Coordenadas: {dados['coordenadas']}", ln=True) # Adicionado no PDF
+    pdf.cell(0, 6, f"GPS Coordenadas: {dados['coordenadas']}", ln=True)
     pdf.set_font("Arial", "B", 11)
     pdf.cell(0, 8, f"Total Quilometragem Rodada: {dados['km_rodados']} KM", ln=True)
     pdf.ln(5)
