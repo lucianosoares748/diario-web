@@ -5,13 +5,14 @@ import os
 from fpdf import FPDF
 
 app = Flask(__name__)
-app.secret_key = "chave_secreta_super_segura" # Necessário para o sistema de login/sessão
+app.secret_key = "chave_secreta_super_segura"
 
-ARQUIVO_LOGO = "logo.png"
+ARQUIVO_LOGO = "static/logo.png"
 
 USUARIOS_CADASTRADOS = {
-    "Luciano": ("Luciano Soares", "M-10065796", "7480"),
-    "Amanda": ("Amanda marques", "M-10065797", "1234")
+    "motorista1": ("João Silva", "M-12345", "1234", "motorista"),
+    "motorista2": ("Maria Souza", "M-67890", "abcd", "motorista"),
+    "admin1": ("Carlos Gestor", "A-00001", "admin123", "admin")
 }
 
 def inicializar_banco():
@@ -31,13 +32,27 @@ def inicializar_banco():
             hora_chegada TEXT,
             km_rodados REAL,
             motivo TEXT,
-            status TEXT DEFAULT 'Em Andamento'
+            status TEXT DEFAULT 'Em Andamento',
+            placa TEXT,
+            frota TEXT,
+            lat_saida TEXT,    -- Nova coluna
+            lon_saida TEXT,    -- Nova coluna
+            lat_chegada TEXT,  -- Nova coluna
+            lon_chegada TEXT   -- Nova coluna
         )
     """)
+    
+    # Código de segurança para adicionar as novas colunas caso o banco já exista
+    novas_colunas = ["lat_saida", "lon_saida", "lat_chegada", "lon_chegada"]
+    for col in novas_colunas:
+        try:
+            cursor.execute(f"ALTER TABLE viagens ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
+            
     conn.commit()
     conn.close()
 
-# --- ROTA: TELA DE LOGIN ---
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -48,29 +63,31 @@ def login():
             session["usuario"] = usuario
             session["nome"] = USUARIOS_CADASTRADOS[usuario][0]
             session["matricula"] = USUARIOS_CADASTRADOS[usuario][1]
-            return redirect(url_for("painel"))
+            session["perfil"] = USUARIOS_CADASTRADOS[usuario][3]
+            
+            if session["perfil"] == "admin":
+                return redirect(url_for("admin_painel"))
+            else:
+                return redirect(url_for("painel"))
         else:
             flash("Usuário ou senha incorretos!", "erro")
             
     return render_template("login.html")
 
-# --- ROTA: LOGOUT ---
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-# --- ROTA: PAINEL PRINCIPAL ---
 @app.route("/painel", methods=["GET", "POST"])
 def painel():
-    if "usuario" not in session:
+    if "usuario" not in session or session["perfil"] != "motorista":
         return redirect(url_for("login"))
         
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     
-    # Verifica se o motorista logado tem alguma viagem em andamento
-    cursor.execute("SELECT id, origem, km_saida, hora_saida, data FROM viagens WHERE motorista = ? AND status = 'Em Andamento'", (session["nome"],))
+    cursor.execute("SELECT id, origem, km_saida, hora_saida, data, placa, frota, lat_saida, lon_saida FROM viagens WHERE motorista = ? AND status = 'Em Andamento'", (session["nome"],))
     viagem_andamento = cursor.fetchone()
     
     if request.method == "POST":
@@ -80,12 +97,16 @@ def painel():
             origem = request.form.get("origem")
             km_saida = request.form.get("km_saida")
             hora_saida = request.form.get("hora_saida")
+            placa = request.form.get("placa").strip().upper()
+            frota = request.form.get("frota").strip()
+            lat_saida = request.form.get("lat_saida")
+            lon_saida = request.form.get("lon_saida")
             data_atual = datetime.now().strftime("%d/%m/%Y")
             
             cursor.execute("""
-                INSERT INTO viagens (motorista, matricula, data, origem, km_saida, hora_saida, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'Em Andamento')
-            """, (session["nome"], session["matricula"], data_atual, origem, km_saida, hora_saida))
+                INSERT INTO viagens (motorista, matricula, data, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Em Andamento')
+            """, (session["nome"], session["matricula"], data_atual, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida))
             conn.commit()
             flash("Viagem iniciada com sucesso!", "sucesso")
             return redirect(url_for("painel"))
@@ -96,8 +117,9 @@ def painel():
             km_chegada = float(request.form.get("km_chegada"))
             hora_chegada = request.form.get("hora_chegada")
             motivo = request.form.get("motivo")
+            lat_chegada = request.form.get("lat_chegada")
+            lon_chegada = request.form.get("lon_chegada")
             
-            # Pega o km de saída para calcular
             cursor.execute("SELECT km_saida FROM viagens WHERE id = ?", (viagem_id,))
             km_saida = cursor.fetchone()[0]
             
@@ -107,9 +129,9 @@ def painel():
                 km_rodados = km_chegada - km_saida
                 cursor.execute("""
                     UPDATE viagens 
-                    SET destino = ?, km_chegada = ?, hora_chegada = ?, km_rodados = ?, motivo = ?, status = 'Finalizada'
+                    SET destino = ?, km_chegada = ?, hora_chegada = ?, km_rodados = ?, motivo = ?, lat_chegada = ?, lon_chegada = ?, status = 'Finalizada'
                     WHERE id = ?
-                """, (destino, km_chegada, hora_chegada, km_rodados, motivo, viagem_id))
+                """, (destino, km_chegada, hora_chegada, km_rodados, motivo, lat_chegada, lon_chegada, viagem_id))
                 conn.commit()
                 flash("Viagem finalizada com sucesso!", "sucesso")
                 return redirect(url_for("painel"))
@@ -117,21 +139,38 @@ def painel():
     conn.close()
     return render_template("painel.html", viagem=viagem_andamento)
 
-# --- ROTA: HISTÓRICO ---
 @app.route("/historico")
 def historico():
-    if "usuario" not in session:
+    if "usuario" not in session or session["perfil"] != "motorista":
         return redirect(url_for("login"))
         
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT id, data, motorista, origem, destino, km_rodados FROM viagens WHERE status = 'Finalizada' ORDER BY id DESC")
+    cursor.execute("SELECT id, data, motorista, origem, destino, km_rodados FROM viagens WHERE motorista = ? AND status = 'Finalizada' ORDER BY id DESC", (session["nome"],))
     viagens = cursor.fetchall()
     conn.close()
     
     return render_template("historico.html", viagens=viagens)
 
-# --- ROTA: GERAR PDF ANEXADO ---
+@app.route("/admin/painel")
+def admin_painel():
+    if "usuario" not in session or session["perfil"] != "admin":
+        return redirect(url_for("login"))
+        
+    conn = sqlite3.connect("diario_bordo.db")
+    cursor = conn.cursor()
+    
+    # Busca incluindo lat e lon da saída
+    cursor.execute("SELECT data, motorista, origem, km_saida, hora_saida, placa, frota, lat_saida, lon_saida FROM viagens WHERE status = 'Em Andamento' ORDER BY id DESC")
+    em_andamento = cursor.fetchall()
+    
+    # Busca incluindo lat e lon de saída e chegada
+    cursor.execute("SELECT id, data, motorista, origem, destino, km_rodados, placa, frota, lat_saida, lon_saida, lat_chegada, lon_chegada FROM viagens WHERE status = 'Finalizada' ORDER BY id DESC")
+    finalizadas = cursor.fetchall()
+    
+    conn.close()
+    return render_template("admin.html", em_andamento=em_andamento, finalizadas=finalizadas)
+
 @app.route("/gerar_pdf/<int:id_viagem>")
 def gerar_pdf(id_viagem):
     if "usuario" not in session:
@@ -139,7 +178,7 @@ def gerar_pdf(id_viagem):
         
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT motorista, matricula, data, origem, destino, km_saida, km_chegada, hora_saida, hora_chegada, km_rodados, motivo FROM viagens WHERE id = ?", (id_viagem,))
+    cursor.execute("SELECT motorista, matricula, data, origem, destino, km_saida, km_chegada, hora_saida, hora_chegada, km_rodados, motivo, placa, frota, lat_saida, lon_saida, lat_chegada, lon_chegada FROM viagens WHERE id = ?", (id_viagem,))
     resultado = cursor.fetchone()
     conn.close()
     
@@ -149,11 +188,13 @@ def gerar_pdf(id_viagem):
     dados = {
         "motorista": resultado[0], "matricula": resultado[1], "data": resultado[2],
         "origem": resultado[3], "destino": resultado[4], "km_saida": resultado[5],
-        "km_chegada": resultado[6], "hora_saida": resultado[7], "hora_chegada": resultado[8],
-        "km_rodados": resultado[9], "motivo": resultado[10]
+        "km_chegada": Float(resultado[6]) if resultado[6] else 0.0, "hora_saida": resultado[7], "hora_chegada": resultado[8],
+        "km_rodados": resultado[9], "motivo": resultado[10],
+        "placa": resultado[11] if resultado[11] else "Não Informado",
+        "frota": resultado[12] if resultado[12] else "Não Informado",
+        "coordenadas": f"Saída: ({resultado[13]}, {resultado[14]}) | Chegada: ({resultado[15]}, {resultado[16]})" if resultado[13] else "Não registradas"
     }
 
-    # Lógica de geração do PDF (exatamente como você já tinha)
     pdf = FPDF()
     pdf.add_page()
     pdf.set_fill_color(33, 150, 243) 
@@ -170,10 +211,10 @@ def gerar_pdf(id_viagem):
         
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "1. Identificação do Condutor", ln=True)
+    pdf.cell(0, 8, "1. Identificação do Condutor e Veículo", ln=True)
     pdf.set_font("Arial", "", 11)
-    pdf.cell(0, 6, f"Motorista: {dados['motorista']}", ln=True)
-    pdf.cell(0, 6, f"Matrícula: {dados['matricula']}", ln=True)
+    pdf.cell(0, 6, f"Motorista: {dados['motorista']}  |  Matrícula: {dados['matricula']}", ln=True)
+    pdf.cell(0, 6, f"Veículo (Placa): {dados['placa']}  |  Nº da Frota: {dados['frota']}", ln=True)
     pdf.cell(0, 6, f"Data da Viagem: {dados['data']}", ln=True)
     pdf.ln(5)
     
@@ -183,6 +224,7 @@ def gerar_pdf(id_viagem):
     pdf.cell(0, 6, f"Origem: {dados['origem']}   |   Destino: {dados['destino']}", ln=True)
     pdf.cell(0, 6, f"KM de Saída: {dados['km_saida']} KM  |  Horário de Saída: {dados['hora_saida']}", ln=True)
     pdf.cell(0, 6, f"KM de Chegada: {dados['km_chegada']} KM  |  Horário de Chegada: {dados['hora_chegada']}", ln=True)
+    pdf.cell(0, 6, f"GPS Coordenadas: {dados['coordenadas']}", ln=True) # Adicionado no PDF
     pdf.set_font("Arial", "B", 11)
     pdf.cell(0, 8, f"Total Quilometragem Rodada: {dados['km_rodados']} KM", ln=True)
     pdf.ln(5)
@@ -200,9 +242,8 @@ def gerar_pdf(id_viagem):
     nome_arquivo = f"viagem_id{id_viagem}.pdf"
     pdf.output(nome_arquivo)
     
-    # O Flask envia o arquivo gerado direto para download no celular/computador do usuário
     return send_file(nome_arquivo, as_attachment=True)
 
 if __name__ == "__main__":
     inicializar_banco()
-    app.run(debug=True, host="0.0.0.0") # host="0.0.0.0" permite que celulares na mesma rede acessem
+    app.run(debug=True, host="0.0.0.0")

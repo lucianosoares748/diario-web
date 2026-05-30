@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel Administrativo - Central</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='estilo.css') }}"
+    />
+  </head>
+  <body>
+    <nav class="navbar navbar-dark bg-primary mb-4">
+      <div class="container">
+        <span class="navbar-brand mb-0 h1"
+          >📊 Central de Monitoramento (Admin)</span
+        >
+        <a href="/logout" class="btn btn-danger btn-sm">Sair</a>
+      </div>
+    </nav>
+
+    <div class="container mb-5">
+      <div class="bg-white p-3 rounded shadow-sm mb-4 text-center">
+        <span class="text-muted small d-block">Gestor Conectado</span>
+        <strong class="text-dark h5">{{ session['nome'] }}</strong>
+      </div>
+
+      <div class="card p-3 shadow-sm bg-white border-0 rounded-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold m-0 text-warning">🟠 Viagens em Andamento</h5>
+          <span class="badge bg-warning text-dark fw-bold"
+            >{{ em_andamento|length }} na rua</span
+          >
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Data</th>
+                <th>Motorista</th>
+                <th>Veículo</th>
+                <th>Origem</th>
+                <th>Saída</th>
+                <th>Localização</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in em_andamento %}
+              <tr class="table-warning-subtle">
+                <td>{{ v[0] }}</td>
+                <td class="fw-bold">{{ v[1] }}</td>
+                <td>
+                  <span class="badge bg-dark">{{ v[5] }}</span>
+                  <span class="badge bg-secondary">F: {{ v[6] }}</span>
+                </td>
+                <td>{{ v[2] }}</td>
+                <td>
+                  {{ v[3] }} KM às
+                  <span class="badge bg-secondary">{{ v[4] }}</span>
+                </td>
+                <td>
+                  {% if v[7] %}
+                  <a
+                    href="https://www.google.com/maps/search/?api=1&query={{ v[7] }},{{ v[8] }}"
+                    target="_blank"
+                    class="btn btn-sm btn-outline-warning fw-bold"
+                    >📍 Ver Mapa</a
+                  >
+                  {% else %}
+                  <span class="text-muted small">Sem GPS</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-3">
+                  Nenhum motorista na estrada no momento.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-3 shadow-sm bg-white border-0 rounded-4">
+        <h5 class="fw-bold mb-3 text-success">
+          🟢 Histórico Geral de Fechamentos
+        </h5>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Data</th>
+                <th>Motorista</th>
+                <th>Veículo</th>
+                <th>Rota (Origem ➔ Destino)</th>
+                <th>Total KM</th>
+                <th class="text-center">Mapa GPS</th>
+                <th class="text-center">Relatório</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in finalizadas %}
+              <tr>
+                <td>{{ v[1] }}</td>
+                <td>{{ v[2] }}</td>
+                <td><small class="fw-bold">{{ v[6] }}</small> ({{ v[7] }})</td>
+                <td>
+                  <span class="fw-semibold">{{ v[3] }}</span> ➔ {{ v[4] }}
+                </td>
+                <td>
+                  <span class="badge bg-info text-dark">{{ v[5] }} KM</span>
+                </td>
+                <td class="text-center">
+                  {% if v[8] %}
+                  <a
+                    href="https://www.google.com/maps/search/?api=1&query={{ v[8] }},{{ v[9] }}"
+                    target="_blank"
+                    class="btn btn-xs btn-outline-secondary p-1 small"
+                    style="font-size: 0.75rem"
+                    >🛫 Saída</a
+                  >
+                  <a
+                    href="https://www.google.com/maps/search/?api=1&query={{ v[10] }},{{ v[11] }}"
+                    target="_blank"
+                    class="btn btn-xs btn-outline-dark p-1 small"
+                    style="font-size: 0.75rem"
+                    >🏁 Chegada</a
+                  >
+                  {% else %}
+                  <span class="text-muted small">-</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  <a
+                    href="/gerar_pdf/{{ v[0] }}"
+                    class="btn btn-outline-success btn-sm fw-bold"
+                    >📄 PDF</a
+                  >
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="text-center text-muted py-3">
+                  Nenhuma viagem finalizada no sistema.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
