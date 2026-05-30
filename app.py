@@ -12,7 +12,7 @@ ARQUIVO_LOGO = "static/logo.png"
 USUARIOS_CADASTRADOS = {
     "motorista1": ("João Silva", "M-12345", "1234", "motorista"),
     "motorista2": ("Maria Souza", "M-67890", "abcd", "motorista"),
-    "admin1": ("Carlos Gestor", "A-00001", "admin123", "admin")
+    "Gustavo": ("Gustavo", "A-00001", "admin123", "admin")
 }
 
 ITENS_CHECKLIST = [
