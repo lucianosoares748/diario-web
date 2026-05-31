@@ -328,14 +328,16 @@ def gerar_pdf(id_viagem):
     conn = sqlite3.connect("diario_bordo.db")
     cursor = conn.cursor()
     cursor.execute("SELECT motorista, matricula, data, origem, destino, km_saida, km_chegada, hora_saida, hora_chegada, km_rodados, motivo, placa, frota, lat_saida, lon_saida, lat_chegada, lon_chegada FROM viagens WHERE id = ?", (id_viagem,))
-    resultado = snapshot = cursor.fetchone()
+    resultado = cursor.fetchone()
     conn.close()
     if not resultado: return "Viagem não encontrada", 404
 
     dados = {
         "motorista": resultado[0], "matricula": resultado[1], "data": resultado[2],
-        "origem": resultado[3], "destino": resultado[4], "km_saida": resultado[5],
-        "km_chegada": float(resultado[6]) if resultado[6] else 0.0, "hora_saida": resultado[7], "hora_chegada": resultado[8],
+        "origem": resultado[3], "destino": resultado[4], 
+        "km_saida": float(resultado[5]) if resultado[5] else 0.0, 
+        "km_chegada": float(resultado[6]) if resultado[6] else 0.0, 
+        "hora_saida": resultado[7], "hora_chegada": resultado[8],
         "km_rodados": resultado[9], "motivo": resultado[10], "placa": resultado[11], "frota": resultado[12],
         "coordenadas": f"Saída: ({resultado[13]}, {resultado[14]}) | Chegada: ({resultado[15]}, {resultado[16]})" if resultado[13] else "Não registradas"
     }
@@ -358,6 +360,10 @@ def gerar_pdf(id_viagem):
     pdf.cell(0, 8, "2. Percurso", ln=True)
     pdf.set_font("Arial", "", 11)
     pdf.cell(0, 6, f"Origem: {dados['origem']} -> Destino: {dados['destino']}", ln=True)
+    
+    # NOVAS LINHAS IMPRIMINDO OS ODÔMETROS ADICIONADAS AQUI:
+    pdf.cell(0, 6, f"KM de Saida: {dados['km_saida']:.0f} KM | KM de Chegada: {dados['km_chegada']:.0f} KM", ln=True)
+    
     pdf.cell(0, 8, f"Total Rodado: {dados['km_rodados']} KM", ln=True)
     
     nome_arquivo = f"viagem_id{id_viagem}.pdf"
