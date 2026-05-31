@@ -10,8 +10,11 @@ app.secret_key = "chave_secreta_super_segura"
 ARQUIVO_LOGO = "static/logo.png"
 
 USUARIOS_CADASTRADOS = {
-    "motorista1": ("João Silva", "M-12345", "1234", "motorista"),
-    "motorista2": ("Maria Souza", "M-67890", "abcd", "motorista"),
+    "luciano": ("luciano", "M-10065796", "7480", "motorista"),
+    "jeferson": ("jeferson", "M-10065798", "1234", "motorista"),
+    "luciano748": ("luciano", "M-10065796", "admin1", "admin"),
+    "Matheus": ("Matheus", "M-67890", "123", "admin"),
+    "Kennedy": ("Kennedy", "M-67891", "123", "admin"),
     "Gustavo": ("Gustavo", "A-00001", "admin123", "admin")
 }
 
